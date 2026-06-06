@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using NexusForever.Game.Abstract;
 using NexusForever.Game.Abstract.Entity;
 using NexusForever.Game.Abstract.Spell;
+using NexusForever.Game.Abstract.Spell.Effect;
 using NexusForever.Game.Abstract.Spell.Event;
 using NexusForever.Game.Abstract.Spell.Target;
 using NexusForever.Game.Abstract.Spell.Target.Implicit;
@@ -473,7 +474,10 @@ namespace NexusForever.Game.Spell
             HandleProxies(executionContext);  // Any Proxies that are added by Effects are evaluated and executed (after ExecuteEffects())
             
             if (!executionContext.IsDelayed)
+            {
                 SendSpellGo();                // Inform the Client once all evaluations are taken place (after Effects & Proxies are executed)
+                SendPhaseSpellVisuals();
+            }
 
             foreach (ICombatLog combatLog in executionContext.GetCombatLogs())
             {
@@ -830,6 +834,61 @@ namespace NexusForever.Game.Spell
             }
 
             Caster.EnqueueToVisible(serverSpellGo, true);
+        }
+
+        private void SendPhaseSpellVisuals()
+        {
+            if (!ShouldReplayPhaseSpellVisuals())
+                return;
+
+            var globalSpellEffectManager = LegacyServiceProvider.Provider.GetService<IGlobalSpellEffectManager>();
+            if (globalSpellEffectManager == null)
+                return;
+
+            var spellVisuals = new List<ServerSpellVisualAdd>();
+            var spellVisualEffectIds = new List<uint>();
+
+            foreach (Spell4VisualEntry visualEntry in Parameters.SpellInfo.Visuals)
+            {
+                uint spellVisualEffectId = globalSpellEffectManager.NextEffectId;
+                spellVisualEffectIds.Add(spellVisualEffectId);
+
+                spellVisuals.Add(new ServerSpellVisualAdd
+                {
+                    SpellVisualEffectClientId = spellVisualEffectId,
+                    UnitId                    = Caster.Guid,
+                    VisualEffectId            = visualEntry.VisualEffectId,
+                    VisualEffectIdSound       = visualEntry.VisualEffectIdSound,
+                    Spell4VisualId            = visualEntry.Id,
+                    Position                  = new Position(Caster.Position)
+                });
+            }
+
+            if (spellVisuals.Count == 0)
+                return;
+
+            Caster.EnqueueToVisible(new ServerSpellVisualListAdd
+            {
+                SpellVisualList = spellVisuals
+            }, true);
+
+            Caster.EnqueueToVisible(new ServerSpellVisualGroupAdd
+            {
+                UnitId                     = Caster.Guid,
+                Spell4VisualGroupId        = (ushort)Parameters.SpellInfo.VisualGroup.Id,
+                Unknown                    = CastingId,
+                SpellVisualEffectUniqueIds = spellVisualEffectIds
+            }, true);
+        }
+
+        private bool ShouldReplayPhaseSpellVisuals()
+        {
+            return Parameters.SpellInfo.VisualGroup != null
+                && Parameters.SpellInfo.VisualGroup.Id <= ushort.MaxValue
+                && Parameters.SpellInfo.Visuals.Count > 0
+                && CastMethod == NexusForever.Game.Static.Spell.CastMethod.Multiphase
+                && Parameters.SpellInfo.Entry.ChannelMaxTime > 0u
+                && currentPhase != byte.MaxValue;
         }
 
         public SpellInit BuildSpellInit()
