@@ -213,6 +213,9 @@ namespace NexusForever.Game.Spell.Type
 
         private void SendThresholdStart()
         {
+            if (IsRapidTapThresholdSpell())
+                return;
+
             if (Caster is IPlayer player)
                 player.Session.EnqueueMessageEncrypted(new ServerSpellThresholdStart
                 {
@@ -221,6 +224,12 @@ namespace NexusForever.Game.Spell.Type
                     ParentSpell4Id = Parameters.ParentSpellInfo?.Entry.Id ?? 0,
                     CastingId = CastingId
                 });
+        }
+
+        private bool IsRapidTapThresholdSpell()
+        {
+            return Parameters.ParentSpellInfo != null
+                && Parameters.SpellInfo.BaseInfo.Entry.CastMethod == CastMethod.RapidTap;
         }
 
         protected void SendThresholdUpdate()

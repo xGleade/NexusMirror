@@ -1,19 +1,25 @@
-﻿using NexusForever.Game.Abstract.Entity;
+using NexusForever.Game.Abstract.Entity;
 using NexusForever.Game.Abstract.Entity.Stat;
+using NexusForever.Game.Static.Entity;
 using NexusForever.Shared.Game;
 
 namespace NexusForever.Game.Entity.Stat.Player
 {
     public class WarriorStatUpdater : IStatUpdater<IPlayer>
     {
+        private const float WarriorKineticEnergyOutOfCombatDecayMultiplier = 1f / 9f;
+
         private readonly UpdateTimer builderTimer = new(TimeSpan.FromSeconds(1.5f));
-        private readonly UpdateTimer decayTimer = new(TimeSpan.FromSeconds(1f));
+        private readonly UpdateTimer decayTimer = new(TimeSpan.FromSeconds(0.5f));
 
         private IPlayer player;
 
         public void Initialise(IPlayer entity)
         {
             player = entity;
+
+            if (player.GetPropertyValue(Property.SpellMechanicEnergyRegenOrDecayMultiplier) <= 0f)
+                player.SetBaseProperty(Property.SpellMechanicEnergyRegenOrDecayMultiplier, WarriorKineticEnergyOutOfCombatDecayMultiplier);
         }
 
         /// <summary>
@@ -31,8 +37,14 @@ namespace NexusForever.Game.Entity.Stat.Player
 
             decayTimer.Reset();
 
-            if (player.Resource1 >= 0)
-                player.Resource1 -= 150f;
+            if (player.Resource1 <= 0f)
+                return;
+
+            float resource1DecayAmount = player.GetPropertyValue(Property.ResourceMax1) *
+                player.GetPropertyValue(Property.SpellMechanicEnergyRegenOrDecayMultiplier) *
+                (float)decayTimer.Duration;
+
+            player.Resource1 -= resource1DecayAmount;
         }
 
         /// <summary>

@@ -36,7 +36,11 @@ namespace NexusForever.Game.Spell.Effect.Handler
         /// </summary>
         public SpellEffectExecutionResult Apply(ISpellExecutionContext executionContext, IUnitEntity target, ISpellTargetEffectInfo info, ISpellEffectDamageData data)
         {
-            if (!target.CanAttack(executionContext.Spell.Caster))
+            IUnitEntity caster = executionContext.Spell.Caster;
+            if (target == null || !target.CanAttack(caster))
+                return SpellEffectExecutionResult.PreventEffect;
+
+            if (caster is INonPlayerEntity && ReferenceEquals(caster, target))
                 return SpellEffectExecutionResult.PreventEffect;
 
             IDamageCalculator damageCalculator = damageCalculatorFactory.Resolve();

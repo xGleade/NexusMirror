@@ -7,6 +7,7 @@ using NexusForever.Game.Abstract.Spell.Target;
 using NexusForever.Game.Static.Combat.CrowdControl;
 using NexusForever.Game.Static.Spell;
 using NexusForever.Game.Static.Spell.Effect;
+using NexusForever.GameTable;
 using NexusForever.GameTable.Model;
 using NexusForever.Network.World.Combat;
 using NexusForever.Network.World.Message.Model;
@@ -80,6 +81,9 @@ namespace NexusForever.Game.Spell.Effect.Handler
                 EffectUniqueId = info.EffectId
             }, true);
 
+            if (data.CCState.Id == CCState.Knockdown)
+                SendKnockdownModelSequence(target, false);
+
             return BuildCombatLog(data.CCState, CCStateApplyRulesResult.Ok, executionContext.Spell, target, reduction - remainder);
         }
 
@@ -106,6 +110,41 @@ namespace NexusForever.Game.Spell.Effect.Handler
                 EffectUniqueId = info.EffectId,
                 Removed        = true
             }, true);
+
+            if (data.CCState.Id == CCState.Knockdown)
+                SendKnockdownModelSequence(target, true);
+        }
+
+        private static void SendKnockdownModelSequence(IUnitEntity target, bool getUp)
+        {
+            uint modelSequenceId = GetKnockdownModelSequenceId(getUp);
+            if (modelSequenceId == 0u)
+                return;
+
+            target.EnqueueToVisible(new ServerSetUnitInModelSequence
+            {
+                UnitId          = target.Guid,
+                ModelSequenceId = modelSequenceId,
+                StartTime       = 0f,
+                Speed           = 1f,
+                Layer           = 0u,
+                Seed            = (ushort)(modelSequenceId & ushort.MaxValue)
+            }, true);
+        }
+
+        private static uint GetKnockdownModelSequenceId(bool getUp)
+        {
+            CCStatesEntry ccStateEntry = GameTableManager.Instance.CCStates?.GetEntry((uint)CCState.Knockdown);
+            if (ccStateEntry == null || ccStateEntry.VisualEffectId01 == 0u)
+                return 0u;
+
+            VisualEffectEntry visualEffectEntry = GameTableManager.Instance.VisualEffect?.GetEntry(ccStateEntry.VisualEffectId01);
+            if (visualEffectEntry == null)
+                return 0u;
+
+            return getUp
+                ? visualEffectEntry.ModelSequenceIdTarget02
+                : visualEffectEntry.ModelSequenceIdTarget00;
         }
 
         private static CombatLogCCState BuildCombatLog(CCStatesEntry ccStateEntry, CCStateApplyRulesResult result, ISpell spell, IUnitEntity target, uint interruptArmorTaken = 0u, bool removed = false)

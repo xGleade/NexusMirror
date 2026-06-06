@@ -35,6 +35,12 @@ namespace NexusForever.Game.Spell
 {
     public abstract class Spell : ISpell
     {
+        private const uint WarriorRampageKineticEnergyCost = 250u;
+        private const uint WarriorRampageStage1Spell4BaseId = 37968u;
+        private const uint WarriorRampageStage2Spell4BaseId = 44605u;
+        private const uint WarriorRampageStage3Spell4BaseId = 47921u;
+        private const uint WarriorRampageStage4Spell4BaseId = 47922u;
+
         public abstract CastMethod CastMethod { get; }
 
         public ISpellParameters Parameters { get; private set; }
@@ -368,6 +374,13 @@ namespace NexusForever.Game.Spell
             if (runnerOveride)
                 return CastResult.Ok;
 
+            CastResult dynamicCostResult = CheckDynamicClassMechanicCost(player);
+            if (dynamicCostResult != CastResult.Ok)
+                return dynamicCostResult;
+
+            if (HasDynamicClassMechanicCost())
+                return CastResult.Ok;
+
             for (int i = 0; i < Parameters.SpellInfo.Entry.CasterInnateRequirements.Length; i++)
             {
                 uint innateRequirement = Parameters.SpellInfo.Entry.CasterInnateRequirements[i];
@@ -522,6 +535,9 @@ namespace NexusForever.Game.Spell
             if (Parameters.CharacterSpell?.MaxAbilityCharges > 0)
                 Parameters.CharacterSpell.UseCharge();
 
+            if (Caster is IPlayer player && CostDynamicClassMechanicVital(player))
+                return;
+
             for (int i = 0; i < Parameters.SpellInfo.Entry.InnateCostTypes.Length; i++)
             {
                 uint innateCostType = Parameters.SpellInfo.Entry.InnateCostTypes[i];
@@ -544,7 +560,7 @@ namespace NexusForever.Game.Spell
                 if (explicitTargetEntity != null)
                     executionContext.TargetCollection.AddTarget(SpellEffectTargetFlags.ExplicitTarget, explicitTargetEntity);
             }
-            else
+            else if (ShouldUseCasterAsPrimaryTarget())
                 executionContext.TargetCollection.AddTarget(SpellEffectTargetFlags.ExplicitTarget, Caster);
 
             // TODO: this might not be entirely correct, research this more...
@@ -729,7 +745,58 @@ namespace NexusForever.Game.Spell
             if (Parameters.PositionalUnitId > 0)
                 return Parameters.PositionalUnitId;
 
-            return Caster.Guid;
+            return ShouldUseCasterAsPrimaryTarget() ? Caster.Guid : 0u;
+        }
+
+        private bool ShouldUseCasterAsPrimaryTarget()
+        {
+            return Parameters.SpellInfo.BaseInfo.IsBuff
+                || Parameters.SpellInfo.BaseInfo.TargetMechanics.TargetType == SpellTargetMechanicType.Self;
+        }
+
+        private bool HasDynamicClassMechanicCost()
+        {
+            return IsWarriorRampageSpell(Parameters.SpellInfo);
+        }
+
+        private CastResult CheckDynamicClassMechanicCost(IPlayer player)
+        {
+            if (!IsWarriorRampageSpell(Parameters.SpellInfo) || Parameters.IsProxy)
+                return CastResult.Ok;
+
+            return CheckVitalCost(player, Vital.KineticEnergy, WarriorRampageKineticEnergyCost);
+        }
+
+        private bool CostDynamicClassMechanicVital(IPlayer player)
+        {
+            if (!IsWarriorRampageSpell(Parameters.SpellInfo) || Parameters.IsProxy)
+                return false;
+
+            Caster.ModifyVital(Vital.KineticEnergy, WarriorRampageKineticEnergyCost * -1f);
+            return true;
+        }
+
+        private CastResult CheckVitalCost(IPlayer player, Vital vital, uint cost)
+        {
+            if (player.GetVitalValue(vital) < cost)
+                return GlobalSpellManager.Instance.GetFailedCastResultForVital(vital);
+
+            return CastResult.Ok;
+        }
+
+        private static bool IsWarriorRampageSpell(ISpellInfo spellInfo)
+        {
+            if (spellInfo?.BaseInfo?.Entry?.ClassIdPlayer != (uint)Class.Warrior)
+                return false;
+
+            return spellInfo.BaseInfo.Entry.Id switch
+            {
+                WarriorRampageStage1Spell4BaseId => true,
+                WarriorRampageStage2Spell4BaseId => true,
+                WarriorRampageStage3Spell4BaseId => true,
+                WarriorRampageStage4Spell4BaseId => true,
+                _                                 => false
+            };
         }
 
         protected void SendSpellStart()

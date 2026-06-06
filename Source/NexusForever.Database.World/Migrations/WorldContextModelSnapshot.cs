@@ -477,6 +477,213 @@ namespace NexusForever.Database.World.Migrations
                     b.ToTable("entity_vendor", (string)null);
                 });
 
+            modelBuilder.Entity("NexusForever.Database.World.Model.ChallengeContentModel", b =>
+                {
+                    b.Property<uint>("ChallengeId")
+                        .HasColumnType("int(10) unsigned")
+                        .HasDefaultValue(0u)
+                        .HasColumnName("challengeId");
+
+                    b.Property<uint?>("ActiveDurationMs")
+                        .HasColumnType("int(10) unsigned")
+                        .HasColumnName("activeDurationMs");
+
+                    b.Property<uint?>("AreaFailDurationMs")
+                        .HasColumnType("int(10) unsigned")
+                        .HasColumnName("areaFailDurationMs");
+
+                    b.Property<string>("Confidence")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("varchar(20)")
+                        .HasDefaultValue("")
+                        .HasColumnName("confidence");
+
+                    b.Property<uint?>("CooldownDurationMs")
+                        .HasColumnType("int(10) unsigned")
+                        .HasColumnName("cooldownDurationMs");
+
+                    b.Property<bool?>("Repeatable")
+                        .HasColumnType("tinyint(1) unsigned")
+                        .HasColumnName("repeatable");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("varchar(250)")
+                        .HasDefaultValue("")
+                        .HasColumnName("source");
+
+                    b.HasKey("ChallengeId")
+                        .HasName("PRIMARY");
+
+                    b.ToTable("challenge_content", (string)null);
+                });
+
+            modelBuilder.Entity("NexusForever.Database.World.Model.PathMissionContentModel", b =>
+                {
+                    b.Property<uint>("MissionId")
+                        .HasColumnType("int(10) unsigned")
+                        .HasDefaultValue(0u)
+                        .HasColumnName("missionId");
+
+                    b.Property<string>("Confidence")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("varchar(20)")
+                        .HasDefaultValue("")
+                        .HasColumnName("confidence");
+
+                    b.Property<uint>("CompletionXp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int(10) unsigned")
+                        .HasDefaultValue(0u)
+                        .HasColumnName("completionXp");
+
+                    b.Property<uint>("ExplorerBeaconCreatureId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int(10) unsigned")
+                        .HasDefaultValue(0u)
+                        .HasColumnName("explorerBeaconCreatureId");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("varchar(250)")
+                        .HasDefaultValue("")
+                        .HasColumnName("source");
+
+                    b.HasKey("MissionId")
+                        .HasName("PRIMARY");
+
+                    b.ToTable("path_mission_content", (string)null);
+                });
+
+            modelBuilder.Entity("NexusForever.Database.World.Model.SoldierHoldoutModel", b =>
+                {
+                    b.Property<uint>("MissionId")
+                        .HasColumnType("int(10) unsigned")
+                        .HasDefaultValue(0u)
+                        .HasColumnName("missionId");
+
+                    b.Property<uint>("ActivatedCreatureId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int(10) unsigned")
+                        .HasDefaultValue(0u)
+                        .HasColumnName("activatedCreatureId");
+
+                    b.Property<uint>("ActivatedDisplayInfoId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int(10) unsigned")
+                        .HasDefaultValue(0u)
+                        .HasColumnName("activatedDisplayInfoId");
+
+                    b.Property<uint>("ActiveModelSequenceId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int(10) unsigned")
+                        .HasDefaultValue(0u)
+                        .HasColumnName("activeModelSequenceId");
+
+                    b.Property<string>("Confidence")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("varchar(20)")
+                        .HasDefaultValue("")
+                        .HasColumnName("confidence");
+
+                    b.Property<ushort>("FallbackFactionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("smallint(5) unsigned")
+                        .HasDefaultValue((ushort)0)
+                        .HasColumnName("fallbackFactionId");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("varchar(250)")
+                        .HasDefaultValue("")
+                        .HasColumnName("source");
+
+                    b.HasKey("MissionId")
+                        .HasName("PRIMARY");
+
+                    b.ToTable("soldier_holdout", (string)null);
+                });
+
+            modelBuilder.Entity("NexusForever.Database.World.Model.SoldierHoldoutWaveModel", b =>
+                {
+                    b.Property<uint>("MissionId")
+                        .HasColumnType("int(10) unsigned")
+                        .HasDefaultValue(0u)
+                        .HasColumnName("missionId");
+
+                    b.Property<uint>("WaveIndex")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int(10) unsigned")
+                        .HasDefaultValue(0u)
+                        .HasColumnName("waveIndex");
+
+                    b.Property<bool>("IsBoss")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1) unsigned")
+                        .HasDefaultValue(false)
+                        .HasColumnName("isBoss");
+
+                    b.Property<float?>("SpawnRadius")
+                        .HasColumnType("float")
+                        .HasColumnName("spawnRadius");
+
+                    b.HasKey("MissionId", "WaveIndex")
+                        .HasName("PRIMARY");
+
+                    b.ToTable("soldier_holdout_wave", (string)null);
+                });
+
+            modelBuilder.Entity("NexusForever.Database.World.Model.SoldierHoldoutWaveSpawnModel", b =>
+                {
+                    b.Property<uint>("MissionId")
+                        .HasColumnType("int(10) unsigned")
+                        .HasDefaultValue(0u)
+                        .HasColumnName("missionId");
+
+                    b.Property<uint>("WaveIndex")
+                        .HasColumnType("int(10) unsigned")
+                        .HasDefaultValue(0u)
+                        .HasColumnName("waveIndex");
+
+                    b.Property<uint>("SpawnIndex")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int(10) unsigned")
+                        .HasDefaultValue(0u)
+                        .HasColumnName("spawnIndex");
+
+                    b.Property<uint>("Count")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int(10) unsigned")
+                        .HasDefaultValue(1u)
+                        .HasColumnName("count");
+
+                    b.Property<uint>("CreatureId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int(10) unsigned")
+                        .HasDefaultValue(0u)
+                        .HasColumnName("creatureId");
+
+                    b.Property<uint>("EntityId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int(10) unsigned")
+                        .HasDefaultValue(0u)
+                        .HasColumnName("entityId");
+
+                    b.HasKey("MissionId", "WaveIndex", "SpawnIndex")
+                        .HasName("PRIMARY");
+
+                    b.HasIndex("CreatureId")
+                        .HasDatabaseName("IX_soldier_holdout_wave_spawn_creatureId");
+
+                    b.ToTable("soldier_holdout_wave_spawn", (string)null);
+                });
+
             modelBuilder.Entity("NexusForever.Database.World.Model.MapEntranceModel", b =>
                 {
                     b.Property<uint>("MapId")
@@ -922,6 +1129,30 @@ namespace NexusForever.Database.World.Migrations
                     b.Navigation("Entity");
                 });
 
+            modelBuilder.Entity("NexusForever.Database.World.Model.SoldierHoldoutWaveModel", b =>
+                {
+                    b.HasOne("NexusForever.Database.World.Model.SoldierHoldoutModel", "Holdout")
+                        .WithMany("Waves")
+                        .HasForeignKey("MissionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK__soldier_holdout_wave_missionId__soldier_holdout_missionId");
+
+                    b.Navigation("Holdout");
+                });
+
+            modelBuilder.Entity("NexusForever.Database.World.Model.SoldierHoldoutWaveSpawnModel", b =>
+                {
+                    b.HasOne("NexusForever.Database.World.Model.SoldierHoldoutWaveModel", "Wave")
+                        .WithMany("Spawns")
+                        .HasForeignKey("MissionId", "WaveIndex")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK__soldier_holdout_wave_spawn_wave__soldier_holdout_wave");
+
+                    b.Navigation("Wave");
+                });
+
             modelBuilder.Entity("NexusForever.Database.World.Model.StoreOfferGroupCategoryModel", b =>
                 {
                     b.HasOne("NexusForever.Database.World.Model.StoreCategoryModel", "Category")
@@ -998,6 +1229,16 @@ namespace NexusForever.Database.World.Migrations
                     b.Navigation("EntityVendorCategory");
 
                     b.Navigation("EntityVendorItem");
+                });
+
+            modelBuilder.Entity("NexusForever.Database.World.Model.SoldierHoldoutModel", b =>
+                {
+                    b.Navigation("Waves");
+                });
+
+            modelBuilder.Entity("NexusForever.Database.World.Model.SoldierHoldoutWaveModel", b =>
+                {
+                    b.Navigation("Spawns");
                 });
 
             modelBuilder.Entity("NexusForever.Database.World.Model.StoreCategoryModel", b =>

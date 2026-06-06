@@ -49,6 +49,9 @@ namespace NexusForever.Game.Combat
         /// </summary>
         public void UpdateThreat(IUnitEntity target, int threat)
         {
+            if (target == null || ReferenceEquals(target, owner))
+                return;
+
             if (hostiles.TryGetValue(target.Guid, out IHostileEntity hostile))
                 UpdateThreat(hostile, threat);
             else
@@ -60,6 +63,9 @@ namespace NexusForever.Game.Combat
         /// </summary>
         private void CreateHostile(IUnitEntity target, int threat)
         {
+            if (target == null || ReferenceEquals(target, owner))
+                return;
+
             IHostileEntity hostile = new HostileEntity(target.Guid);
             hostile.UpdateThreat(threat);
             hostiles.Add(hostile.HatedUnitId, hostile);

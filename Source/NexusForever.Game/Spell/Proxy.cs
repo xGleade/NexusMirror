@@ -27,10 +27,18 @@ namespace NexusForever.Game.Spell
             {
                 ParentSpellInfo = parameters.SpellInfo,
                 RootSpellInfo = parameters.RootSpellInfo,
-                PrimaryTargetId = Target.Guid,
+                PrimaryTargetId = GetProxyPrimaryTargetId(parameters, target),
                 UserInitiatedSpellCast = parameters.UserInitiatedSpellCast,
                 IsProxy = true
             };
+        }
+
+        private static uint GetProxyPrimaryTargetId(ISpellParameters parameters, IUnitEntity target)
+        {
+            if (parameters.PrimaryTargetId > 0u)
+                return parameters.PrimaryTargetId;
+
+            return target?.Guid ?? 0u;
         }
 
         public void Evaluate()
