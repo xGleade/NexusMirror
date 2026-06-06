@@ -9,7 +9,9 @@ using NexusForever.Game.Abstract.Spell.Proc;
 using NexusForever.Game.Abstract.Spell.Target;
 using NexusForever.Game.Combat;
 using NexusForever.Game.Combat.CrowdControl;
+using NexusForever.Game.Soldier;
 using NexusForever.Game.Static;
+using NexusForever.Game.Static.Challenges;
 using NexusForever.Game.Static.Entity;
 using NexusForever.Game.Static.PublicEvent;
 using NexusForever.Game.Static.Quest;
@@ -551,6 +553,7 @@ namespace NexusForever.Game.Entity
             }
 
             GenerateRewards(killer);
+            SoldierHoldoutController.OnUnitDeath(this, killer);
             // TODO: schedule respawn
 
             ThreatManager.ClearThreatList();
@@ -583,10 +586,21 @@ namespace NexusForever.Game.Entity
             player.QuestManager.ObjectiveUpdate(QuestObjectiveType.KillCreature, CreatureId, 1u);
             player.QuestManager.ObjectiveUpdate(QuestObjectiveType.KillCreature2, CreatureId, 1u);
 
+            Player playerEntity = player as Player;
+            if (playerEntity != null)
+            {
+                if (this is INonPlayerEntity nonPlayer)
+                    playerEntity.ChallengeManager.UpdateKillCreature(nonPlayer, 1u);
+                else
+                    playerEntity.ChallengeManager.UpdateObjective(ChallengeObjectiveType.KillCreature, CreatureId, 1u);
+            }
+
             foreach (uint targetGroupId in AssetManager.Instance.GetTargetGroupsForCreatureId(CreatureId))
             {
                 player.QuestManager.ObjectiveUpdate(QuestObjectiveType.KillTargetGroup, targetGroupId, 1u);
                 player.QuestManager.ObjectiveUpdate(QuestObjectiveType.KillTargetGroups, targetGroupId, 1u);
+                if (playerEntity != null)
+                    playerEntity.ChallengeManager.UpdateObjective(ChallengeObjectiveType.KillTargetGroup, targetGroupId, 1u);
             }
 
             // TODO: Reward XP

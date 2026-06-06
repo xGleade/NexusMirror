@@ -3,6 +3,7 @@ using NexusForever.Game.Abstract;
 using NexusForever.Game.Abstract.Combat;
 using NexusForever.Game.Achievement;
 using NexusForever.Game.Character;
+using NexusForever.Game.Challenge;
 using NexusForever.Game.Chat;
 using NexusForever.Game.Cinematic;
 using NexusForever.Game.Combat;
@@ -13,11 +14,13 @@ using NexusForever.Game.Guild;
 using NexusForever.Game.Housing;
 using NexusForever.Game.Map;
 using NexusForever.Game.Matching;
+using NexusForever.Game.PathMission;
 using NexusForever.Game.Prerequisite;
 using NexusForever.Game.Quest;
 using NexusForever.Game.RBAC;
 using NexusForever.Game.Reputation;
 using NexusForever.Game.Server;
+using NexusForever.Game.Soldier;
 using NexusForever.Game.Spell;
 using NexusForever.Game.Storefront;
 using NexusForever.Shared;
@@ -36,6 +39,9 @@ namespace NexusForever.Game
             sc.AddSingletonLegacy<IShutdownManager, ShutdownManager>();
             sc.AddSingletonLegacy<IStoryBuilder, StoryBuilder>();
             sc.AddSingletonLegacy<IDamageCalculator, DamageCalculator>();
+            sc.AddSingleton<GlobalChallengeManager>();
+            sc.AddSingleton<PathMissionContentManager>();
+            sc.AddSingleton<SoldierHoldoutDefinitionManager>();
 
             sc.AddTransient<IRapidTransportCostCalculator, RapidTransportCostCalculator>();
 

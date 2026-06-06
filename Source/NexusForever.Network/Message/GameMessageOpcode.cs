@@ -648,6 +648,7 @@ namespace NexusForever.Network.Message
         ClientGenericMapNodeChosen      = 0x0754,
         ServerEntityInteractiveUpdate   = 0x0755,
         ServerCommunicatorMessage       = 0x0757,
+        ServerSetUnitInModelSequence    = 0x074A,
         ServerGenericMapShow            = 0x0758,
         ServerStoryPanelHide            = 0x0759,
         ServerStoryPanelShow            = 0x075A,

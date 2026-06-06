@@ -29,6 +29,7 @@ namespace NexusForever.Game
 
         private ImmutableDictionary</*zoneId*/uint, /*tutorialId*/uint> zoneTutorials;
         private ImmutableDictionary</*creatureId*/uint, /*targetGroupIds*/ImmutableList<uint>> creatureAssociatedTargetGroups;
+        private ImmutableDictionary</*targetGroupId*/uint, /*creatureIds*/ImmutableList<uint>> targetGroupCreatureIds;
 
         private ImmutableDictionary<AccountTier, ImmutableList<RewardPropertyPremiumModifierEntry>> rewardPropertiesByTier;
 
@@ -90,21 +91,52 @@ namespace NexusForever.Game
         private void CacheCreatureTargetGroups()
         {
             var entries = ImmutableDictionary.CreateBuilder<uint, List<uint>>();
+            var targetGroupEntries = ImmutableDictionary.CreateBuilder<uint, ImmutableList<uint>>();
+            Dictionary<uint, TargetGroupEntry> targetGroups = GameTableManager.Instance.TargetGroup.Entries.ToDictionary(e => e.Id);
+
             foreach (TargetGroupEntry entry in GameTableManager.Instance.TargetGroup.Entries)
             {
-                if ((TargetGroupType)entry.Type != TargetGroupType.CreatureIdGroup)
-                    continue;
+                ImmutableList<uint> creatureIds = GetCreatureIdsForTargetGroup(entry, targetGroups, new HashSet<uint>())
+                    .Distinct()
+                    .ToImmutableList();
 
-                foreach (uint creatureId in entry.DataEntries)
+                targetGroupEntries.Add(entry.Id, creatureIds);
+
+                foreach (uint creatureId in creatureIds)
                 {
                     if (!entries.ContainsKey(creatureId))
                         entries.Add(creatureId, new List<uint>());
 
-                    entries[creatureId].Add(entry.Id);
+                    if (!entries[creatureId].Contains(entry.Id))
+                        entries[creatureId].Add(entry.Id);
                 }
             }
 
             creatureAssociatedTargetGroups = entries.ToImmutableDictionary(e => e.Key, e => e.Value.ToImmutableList());
+            targetGroupCreatureIds = targetGroupEntries.ToImmutable();
+        }
+
+        private IEnumerable<uint> GetCreatureIdsForTargetGroup(TargetGroupEntry entry, IReadOnlyDictionary<uint, TargetGroupEntry> targetGroups, HashSet<uint> seen)
+        {
+            if (entry == null || !seen.Add(entry.Id))
+                yield break;
+
+            if ((TargetGroupType)entry.Type == TargetGroupType.CreatureIdGroup)
+            {
+                foreach (uint creatureId in entry.DataEntries.Where(d => d != 0u))
+                    yield return creatureId;
+
+                yield break;
+            }
+
+            foreach (uint nestedTargetGroupId in entry.DataEntries.Where(d => d != 0u))
+            {
+                if (!targetGroups.TryGetValue(nestedTargetGroupId, out TargetGroupEntry child))
+                    continue;
+
+                foreach (uint creatureId in GetCreatureIdsForTargetGroup(child, targetGroups, seen))
+                    yield return creatureId;
+            }
         }
 
         private void CacheRewardPropertiesByTier()
@@ -149,6 +181,14 @@ namespace NexusForever.Game
         public ImmutableList<uint> GetTargetGroupsForCreatureId(uint creatureId)
         {
             return creatureAssociatedTargetGroups.TryGetValue(creatureId, out ImmutableList<uint> entries) ? entries : [];
+        }
+
+        /// <summary>
+        /// Returns an <see cref="ImmutableList{T}"/> containing all Creature2 ID's associated with the target group.
+        /// </summary>
+        public ImmutableList<uint> GetCreatureIdsForTargetGroup(uint targetGroupId)
+        {
+            return targetGroupCreatureIds.TryGetValue(targetGroupId, out ImmutableList<uint> entries) ? entries : ImmutableList<uint>.Empty;
         }
 
         /// <summary>

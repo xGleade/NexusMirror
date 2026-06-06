@@ -11,6 +11,7 @@ using NexusForever.Game.Abstract.Map.Instance;
 using NexusForever.Game.Abstract.Map.Search;
 using NexusForever.Game.Abstract.PublicEvent;
 using NexusForever.Game.Configuration.Model;
+using NexusForever.Game.Soldier;
 using NexusForever.Game.Static.Entity;
 using NexusForever.Game.Static.Map;
 using NexusForever.Game.Static.Spell;
@@ -99,6 +100,7 @@ namespace NexusForever.Game.Map
             scriptCollection?.Invoke<IUpdate>(s => s.Update(lastTick));
 
             PublicEventManager.Update(lastTick);
+            SoldierHoldoutController.Update(this, lastTick);
         }
 
         private void ProcessGridActions()
@@ -493,6 +495,7 @@ namespace NexusForever.Game.Map
             add?.Invoke(this, guid, vector);
 
             PublicEventManager.OnAddToMap(entity);
+            SoldierHoldoutController.OnAddToMap(entity);
             scriptCollection?.Invoke<IMapScript>(s => s.OnAddToMap(entity));
 
             log.Trace($"Added entity {entity.Guid} to map {Entry.Id} at {vector.X},{vector.Y},{vector.Z}.");
@@ -510,6 +513,7 @@ namespace NexusForever.Game.Map
             entities.Remove(entity.Guid);
 
             scriptCollection?.Invoke<IMapScript>(s => s.OnRemoveFromMap(entity));
+            SoldierHoldoutController.OnRemoveFromMap(entity);
             PublicEventManager.OnRemoveFromMap(entity);
 
             remove?.Invoke();

@@ -22,6 +22,7 @@ using NexusForever.Game.Abstract.Reputation;
 using NexusForever.Game.Abstract.Spell;
 using NexusForever.Game.Achievement;
 using NexusForever.Game.Character;
+using NexusForever.Game.Challenge;
 using NexusForever.Game.Chat;
 using NexusForever.Game.Configuration.Model;
 using NexusForever.Game.Guild;
@@ -242,6 +243,7 @@ namespace NexusForever.Game.Entity
         public IMailManager MailManager { get; private set; }
         public IZoneMapManager ZoneMapManager { get; private set; }
         public IQuestManager QuestManager { get; private set; }
+        public ChallengeManager ChallengeManager { get; private set; }
         public ICharacterAchievementManager AchievementManager { get; private set; }
         public ISupplySatchelManager SupplySatchelManager { get; private set; }
         public IXpManager XpManager { get; private set; }
@@ -360,7 +362,7 @@ namespace NexusForever.Game.Entity
             CostumeManager          = new CostumeManager(this, model);
             Inventory               = new Inventory(this, model);
             CurrencyManager.Initialise(this, model);
-            PathManager             = new PathManager(this, model);
+            PathManager             = new PathManager(this, model, entityFactory, creatureInfoManager);
             TitleManager            = new TitleManager(this, model);
             SpellManager            = new SpellManager(this, model);
             PetCustomisationManager = new PetCustomisationManager(this, model);
@@ -369,6 +371,7 @@ namespace NexusForever.Game.Entity
             MailManager             = new MailManager(this, model);
             ZoneMapManager          = new ZoneMapManager(this, model);
             QuestManager.Initialise(this, model);
+            ChallengeManager        = new ChallengeManager(this, model);
             AchievementManager      = new CharacterAchievementManager(this, model);
             SupplySatchelManager    = new SupplySatchelManager(this, model);
             XpManager               = new XpManager(this, model);
@@ -414,6 +417,7 @@ namespace NexusForever.Game.Entity
             SpellManager.Update(lastTick);
             CostumeManager.Update(lastTick);
             QuestManager.Update(lastTick);
+            ChallengeManager.Update(lastTick);
             ResurrectionManager.Update(lastTick);
 
             relocationTimer.Update(lastTick);
@@ -606,6 +610,7 @@ namespace NexusForever.Game.Entity
             MailManager.Save(context);
             ZoneMapManager.Save(context);
             QuestManager.Save(context);
+            ChallengeManager.Save(context);
             AchievementManager.Save(context);
             SupplySatchelManager.Save(context);
             XpManager.Save(context);
@@ -800,6 +805,7 @@ namespace NexusForever.Game.Entity
             ZoneMapManager.SendInitialPackets();
             Account.CurrencyManager.SendInitialPackets();
             QuestManager.SendInitialPackets();
+            ChallengeManager.SendInitialState();
             AchievementManager.SendInitialPackets(null);
             Account.RewardPropertyManager.SendInitialPackets();
             ResurrectionManager.SendInitialPackets();

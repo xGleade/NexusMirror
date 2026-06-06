@@ -42,6 +42,7 @@ namespace NexusForever.Database.Character.Model
 
         public ResidenceModel Residence { get; set; }
         public ICollection<CharacterAchievementModel> Achievement { get; set; } = new HashSet<CharacterAchievementModel>();
+        public ICollection<CharacterChallengeModel> Challenge { get; set; } = new HashSet<CharacterChallengeModel>();
         public ICollection<CharacterActionSetAmpModel> ActionSetAmp { get; set; } = new HashSet<CharacterActionSetAmpModel>();
         public ICollection<CharacterActionSetShortcutModel> ActionSetShortcut { get; set; } = new HashSet<CharacterActionSetShortcutModel>();
         public ICollection<CharacterAppearanceModel> Appearance { get; set; } = new HashSet<CharacterAppearanceModel>();
@@ -54,6 +55,7 @@ namespace NexusForever.Database.Character.Model
         public ICollection<CharacterKeybindingModel> Keybinding { get; set; } = new HashSet<CharacterKeybindingModel>();
         public ICollection<CharacterMailModel> Mail { get; set; } = new HashSet<CharacterMailModel>();
         public ICollection<CharacterPathModel> Path { get; set; } = new HashSet<CharacterPathModel>();
+        public ICollection<CharacterPathMissionModel> PathMission { get; set; } = new HashSet<CharacterPathMissionModel>();
         public ICollection<CharacterPetCustomisationModel> PetCustomisation { get; set; } = new HashSet<CharacterPetCustomisationModel>();
         public ICollection<CharacterPetFlairModel> PetFlair { get; set; } = new HashSet<CharacterPetFlairModel>();
         public ICollection<CharacterQuestModel> Quest { get; set; } = new HashSet<CharacterQuestModel>();

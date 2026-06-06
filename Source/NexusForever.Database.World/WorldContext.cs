@@ -22,6 +22,11 @@ namespace NexusForever.Database.World
         public DbSet<EntityVendorModel> EntityVendor { get; set; }
         public DbSet<EntityVendorCategoryModel> EntityVendorCategory { get; set; }
         public DbSet<EntityVendorItemModel> EntityVendorItem { get; set; }
+        public DbSet<ChallengeContentModel> ChallengeContent { get; set; }
+        public DbSet<PathMissionContentModel> PathMissionContent { get; set; }
+        public DbSet<SoldierHoldoutModel> SoldierHoldout { get; set; }
+        public DbSet<SoldierHoldoutWaveModel> SoldierHoldoutWave { get; set; }
+        public DbSet<SoldierHoldoutWaveSpawnModel> SoldierHoldoutWaveSpawn { get; set; }
         public DbSet<MapEntranceModel> MapEntrance { get; set; }
         public DbSet<StoreCategoryModel> StoreCategory { get; set; }
         public DbSet<StoreOfferGroupModel> StoreOfferGroup { get; set; }
@@ -490,6 +495,204 @@ namespace NexusForever.Database.World
                     .WithMany(p => p.EntityVendorItem)
                     .HasForeignKey(d => d.Id)
                     .HasConstraintName("FK__entity_vendor_item_id__entity_id");
+            });
+
+            modelBuilder.Entity<ChallengeContentModel>(entity =>
+            {
+                entity.ToTable("challenge_content");
+
+                entity.HasKey(e => e.ChallengeId)
+                    .HasName("PRIMARY");
+
+                entity.Property(e => e.ChallengeId)
+                    .HasColumnName("challengeId")
+                    .HasColumnType("int(10) unsigned")
+                    .HasDefaultValue(0);
+
+                entity.Property(e => e.ActiveDurationMs)
+                    .HasColumnName("activeDurationMs")
+                    .HasColumnType("int(10) unsigned");
+
+                entity.Property(e => e.CooldownDurationMs)
+                    .HasColumnName("cooldownDurationMs")
+                    .HasColumnType("int(10) unsigned");
+
+                entity.Property(e => e.AreaFailDurationMs)
+                    .HasColumnName("areaFailDurationMs")
+                    .HasColumnType("int(10) unsigned");
+
+                entity.Property(e => e.Repeatable)
+                    .HasColumnName("repeatable")
+                    .HasColumnType("tinyint(1) unsigned");
+
+                entity.Property(e => e.Source)
+                    .IsRequired()
+                    .HasColumnName("source")
+                    .HasColumnType("varchar(250)")
+                    .HasDefaultValue("");
+
+                entity.Property(e => e.Confidence)
+                    .IsRequired()
+                    .HasColumnName("confidence")
+                    .HasColumnType("varchar(20)")
+                    .HasDefaultValue("");
+            });
+
+            modelBuilder.Entity<PathMissionContentModel>(entity =>
+            {
+                entity.ToTable("path_mission_content");
+
+                entity.HasKey(e => e.MissionId)
+                    .HasName("PRIMARY");
+
+                entity.Property(e => e.MissionId)
+                    .HasColumnName("missionId")
+                    .HasColumnType("int(10) unsigned")
+                    .HasDefaultValue(0);
+
+                entity.Property(e => e.CompletionXp)
+                    .HasColumnName("completionXp")
+                    .HasColumnType("int(10) unsigned")
+                    .HasDefaultValue(0);
+
+                entity.Property(e => e.ExplorerBeaconCreatureId)
+                    .HasColumnName("explorerBeaconCreatureId")
+                    .HasColumnType("int(10) unsigned")
+                    .HasDefaultValue(0);
+
+                entity.Property(e => e.Source)
+                    .IsRequired()
+                    .HasColumnName("source")
+                    .HasColumnType("varchar(250)")
+                    .HasDefaultValue("");
+
+                entity.Property(e => e.Confidence)
+                    .IsRequired()
+                    .HasColumnName("confidence")
+                    .HasColumnType("varchar(20)")
+                    .HasDefaultValue("");
+            });
+
+            modelBuilder.Entity<SoldierHoldoutModel>(entity =>
+            {
+                entity.ToTable("soldier_holdout");
+
+                entity.HasKey(e => e.MissionId)
+                    .HasName("PRIMARY");
+
+                entity.Property(e => e.MissionId)
+                    .HasColumnName("missionId")
+                    .HasColumnType("int(10) unsigned")
+                    .HasDefaultValue(0);
+
+                entity.Property(e => e.ActivatedCreatureId)
+                    .HasColumnName("activatedCreatureId")
+                    .HasColumnType("int(10) unsigned")
+                    .HasDefaultValue(0);
+
+                entity.Property(e => e.ActivatedDisplayInfoId)
+                    .HasColumnName("activatedDisplayInfoId")
+                    .HasColumnType("int(10) unsigned")
+                    .HasDefaultValue(0);
+
+                entity.Property(e => e.ActiveModelSequenceId)
+                    .HasColumnName("activeModelSequenceId")
+                    .HasColumnType("int(10) unsigned")
+                    .HasDefaultValue(0);
+
+                entity.Property(e => e.FallbackFactionId)
+                    .HasColumnName("fallbackFactionId")
+                    .HasColumnType("smallint(5) unsigned")
+                    .HasDefaultValue(0);
+
+                entity.Property(e => e.Source)
+                    .IsRequired()
+                    .HasColumnName("source")
+                    .HasColumnType("varchar(250)")
+                    .HasDefaultValue("");
+
+                entity.Property(e => e.Confidence)
+                    .IsRequired()
+                    .HasColumnName("confidence")
+                    .HasColumnType("varchar(20)")
+                    .HasDefaultValue("");
+            });
+
+            modelBuilder.Entity<SoldierHoldoutWaveModel>(entity =>
+            {
+                entity.ToTable("soldier_holdout_wave");
+
+                entity.HasKey(e => new { e.MissionId, e.WaveIndex })
+                    .HasName("PRIMARY");
+
+                entity.Property(e => e.MissionId)
+                    .HasColumnName("missionId")
+                    .HasColumnType("int(10) unsigned")
+                    .HasDefaultValue(0);
+
+                entity.Property(e => e.WaveIndex)
+                    .HasColumnName("waveIndex")
+                    .HasColumnType("int(10) unsigned")
+                    .HasDefaultValue(0);
+
+                entity.Property(e => e.IsBoss)
+                    .HasColumnName("isBoss")
+                    .HasColumnType("tinyint(1) unsigned")
+                    .HasDefaultValue(false);
+
+                entity.Property(e => e.SpawnRadius)
+                    .HasColumnName("spawnRadius")
+                    .HasColumnType("float");
+
+                entity.HasOne(d => d.Holdout)
+                    .WithMany(p => p.Waves)
+                    .HasForeignKey(d => d.MissionId)
+                    .HasConstraintName("FK__soldier_holdout_wave_missionId__soldier_holdout_missionId");
+            });
+
+            modelBuilder.Entity<SoldierHoldoutWaveSpawnModel>(entity =>
+            {
+                entity.ToTable("soldier_holdout_wave_spawn");
+
+                entity.HasKey(e => new { e.MissionId, e.WaveIndex, e.SpawnIndex })
+                    .HasName("PRIMARY");
+
+                entity.HasIndex(e => e.CreatureId);
+
+                entity.Property(e => e.MissionId)
+                    .HasColumnName("missionId")
+                    .HasColumnType("int(10) unsigned")
+                    .HasDefaultValue(0);
+
+                entity.Property(e => e.WaveIndex)
+                    .HasColumnName("waveIndex")
+                    .HasColumnType("int(10) unsigned")
+                    .HasDefaultValue(0);
+
+                entity.Property(e => e.SpawnIndex)
+                    .HasColumnName("spawnIndex")
+                    .HasColumnType("int(10) unsigned")
+                    .HasDefaultValue(0);
+
+                entity.Property(e => e.CreatureId)
+                    .HasColumnName("creatureId")
+                    .HasColumnType("int(10) unsigned")
+                    .HasDefaultValue(0);
+
+                entity.Property(e => e.Count)
+                    .HasColumnName("count")
+                    .HasColumnType("int(10) unsigned")
+                    .HasDefaultValue(1);
+
+                entity.Property(e => e.EntityId)
+                    .HasColumnName("entityId")
+                    .HasColumnType("int(10) unsigned")
+                    .HasDefaultValue(0);
+
+                entity.HasOne(d => d.Wave)
+                    .WithMany(p => p.Spawns)
+                    .HasForeignKey(d => new { d.MissionId, d.WaveIndex })
+                    .HasConstraintName("FK__soldier_holdout_wave_spawn_wave__soldier_holdout_wave");
             });
 
             modelBuilder.Entity<MapEntranceModel>(entity =>

@@ -109,6 +109,32 @@ namespace NexusForever.Database.World
             return context.Disable.ToImmutableList();
         }
 
+        public ImmutableList<SoldierHoldoutModel> GetSoldierHoldouts()
+        {
+            using var context = new WorldContext(config);
+            return context.SoldierHoldout
+                .Include(e => e.Waves)
+                    .ThenInclude(e => e.Spawns)
+                .AsNoTracking()
+                .ToImmutableList();
+        }
+
+        public ImmutableList<PathMissionContentModel> GetPathMissionContent()
+        {
+            using var context = new WorldContext(config);
+            return context.PathMissionContent
+                .AsNoTracking()
+                .ToImmutableList();
+        }
+
+        public ImmutableList<ChallengeContentModel> GetChallengeContent()
+        {
+            using var context = new WorldContext(config);
+            return context.ChallengeContent
+                .AsNoTracking()
+                .ToImmutableList();
+        }
+
         public ImmutableList<StoreCategoryModel> GetStoreCategories()
         {
             using var context = new WorldContext(config);
