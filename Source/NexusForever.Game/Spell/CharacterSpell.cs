@@ -51,7 +51,7 @@ namespace NexusForever.Game.Spell
 
         private UnlockedSpellSaveMask saveMask;
 
-        private UpdateTimer rechargeTimer;
+        private readonly List<UpdateTimer> rechargeTimers = [];
         private bool buttonPressed;
         private CastMethod castMethod;
         private bool noCooldown => SpellInfo.Entry.SpellCoolDown == 0 && SpellInfo.Entry.SpellCoolDownIds.Where(x => x != 0).Count() == 0u;
@@ -63,9 +63,9 @@ namespace NexusForever.Game.Spell
         {
             Owner     = player;
             BaseInfo  = baseInfo;
-            SpellInfo = baseInfo.GetSpellInfo(tier);
             Item      = item;
             tier      = model.Tier;
+            SpellInfo = baseInfo.GetSpellInfo(tier);
             castMethod = (CastMethod)baseInfo.Entry.CastMethod;
             if (SpellInfo.Entry.Spell4IdMechanicAlternateSpell > 0)
             {
@@ -103,21 +103,32 @@ namespace NexusForever.Game.Spell
             if (MaxAbilityCharges == 0u)
                 return;
 
-            rechargeTimer = new(SpellInfo.Entry.AbilityRechargeTime / 1000d, false);
+            rechargeTimers.Clear();
             AbilityCharges = MaxAbilityCharges;
             SendChargeUpdate();
         }
 
         public void Update(double lastTick)
         {
-            if (MaxAbilityCharges > 0 && rechargeTimer.IsTicking)
+            if (MaxAbilityCharges == 0u || rechargeTimers.Count == 0)
+                return;
+
+            foreach (UpdateTimer timer in rechargeTimers.ToArray())
             {
-                rechargeTimer.Update(lastTick);
-                if (rechargeTimer.HasElapsed)
-                {
-                    AbilityCharges = Math.Clamp(AbilityCharges + SpellInfo.Entry.AbilityRechargeCount, 0u, MaxAbilityCharges);
+                timer.Update(lastTick);
+                if (!timer.HasElapsed)
+                    continue;
+
+                rechargeTimers.Remove(timer);
+                uint previousCharges = AbilityCharges;
+                AbilityCharges = Math.Clamp(AbilityCharges + SpellInfo.Entry.AbilityRechargeCount, 0u, MaxAbilityCharges);
+                if (AbilityCharges != previousCharges)
                     SendChargeUpdate();
-                    rechargeTimer.Reset(AbilityCharges < MaxAbilityCharges);
+
+                if (AbilityCharges == MaxAbilityCharges)
+                {
+                    rechargeTimers.Clear();
+                    break;
                 }
             }
         }
@@ -237,9 +248,16 @@ namespace NexusForever.Game.Spell
 
             // TODO: Ability Charges are affected by ModifyCooldown spell effect. Needs to be handled to adjust Charge timer. Possibly move charges to SpellManager.
             AbilityCharges -= 1;
-            if (!rechargeTimer.IsTicking)
-                rechargeTimer.Reset(true);
+            QueueRecharge();
             SendChargeUpdate();
+        }
+
+        private void QueueRecharge()
+        {
+            if (AbilityCharges >= MaxAbilityCharges)
+                return;
+
+            rechargeTimers.Add(new UpdateTimer(SpellInfo.Entry.AbilityRechargeTime / 1000d));
         }
 
         private void SendChargeUpdate()

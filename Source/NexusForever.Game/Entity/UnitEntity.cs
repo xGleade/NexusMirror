@@ -361,15 +361,15 @@ namespace NexusForever.Game.Entity
         /// <summary>
         /// Cast a <see cref="ISpell"/> with the supplied spell id and <see cref="ISpellParameters"/>.
         /// </summary>
-        public void CastSpell<T>(T spell4Id, ISpellParameters parameters) where T : Enum
+        public bool CastSpell<T>(T spell4Id, ISpellParameters parameters) where T : Enum
         {
-            CastSpell(spell4Id.As<T, uint>(), parameters);
+            return CastSpell(spell4Id.As<T, uint>(), parameters);
         }
 
         /// <summary>
         /// Cast a <see cref="ISpell"/> with the supplied spell id and <see cref="ISpellParameters"/>.
         /// </summary>
-        public void CastSpell(uint spell4Id, ISpellParameters parameters)
+        public bool CastSpell(uint spell4Id, ISpellParameters parameters)
         {
             if (parameters == null)
                 throw new ArgumentNullException();
@@ -378,13 +378,13 @@ namespace NexusForever.Game.Entity
             if (spell4Entry == null)
                 throw new ArgumentOutOfRangeException();
 
-            CastSpell(spell4Entry.Spell4BaseIdBaseSpell, (byte)spell4Entry.TierIndex, parameters);
+            return CastSpell(spell4Entry.Spell4BaseIdBaseSpell, (byte)spell4Entry.TierIndex, parameters);
         }
 
         /// <summary>
         /// Cast a <see cref="ISpell"/> with the supplied spell base id, tier and <see cref="ISpellParameters"/>.
         /// </summary>
-        public void CastSpell(uint spell4BaseId, byte tier, ISpellParameters parameters)
+        public bool CastSpell(uint spell4BaseId, byte tier, ISpellParameters parameters)
         {
             if (parameters == null)
                 throw new ArgumentNullException();
@@ -398,16 +398,16 @@ namespace NexusForever.Game.Entity
                 throw new ArgumentOutOfRangeException();
 
             parameters.SpellInfo = spellInfo;
-            CastSpell(parameters);
+            return CastSpell(parameters);
         }
 
         /// <summary>
         /// Cast a <see cref="ISpell"/> with the supplied <see cref="ISpellParameters"/>.
         /// </summary>
-        public void CastSpell(ISpellParameters parameters)
+        public bool CastSpell(ISpellParameters parameters)
         {
             if (!IsAlive)
-                return;
+                return false;
 
             if (parameters == null)
                 throw new ArgumentNullException();
@@ -416,14 +416,14 @@ namespace NexusForever.Game.Entity
             {
                 if (this is IPlayer player)
                     player.SendSystemMessage($"Unable to cast base spell {parameters.SpellInfo.BaseInfo.Entry.Id} because it is disabled.");
-                return;
+                return false;
             }
 
             if (DisableManager.Instance.IsDisabled(DisableType.Spell, parameters.SpellInfo.Entry.Id))
             {
                 if (this is IPlayer player)
                     player.SendSystemMessage($"Unable to cast spell {parameters.SpellInfo.Entry.Id} because it is disabled.");
-                return;
+                return false;
             }
 
             if (parameters.UserInitiatedSpellCast)
@@ -442,13 +442,14 @@ namespace NexusForever.Game.Entity
 
             spell.Initialise(this, parameters);
             if (!spell.Cast())
-                return;
+                return false;
 
             // Don't store spell if it failed to initialise
             if (spell.IsFailed)
-                return;
+                return false;
 
             pendingSpells.Add(spell);
+            return true;
         }
 
         /// <summary>

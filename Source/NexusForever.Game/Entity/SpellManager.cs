@@ -83,6 +83,18 @@ namespace NexusForever.Game.Entity
             { Class.Spellslinger, new List<uint> { 69704 } }
         };
 
+        private static readonly UILocation[] starterAbilitySlots =
+        [
+            UILocation.LAS1,
+            UILocation.LAS2,
+            UILocation.LAS3,
+            UILocation.LAS4,
+            UILocation.LAS5,
+            UILocation.LAS6,
+            UILocation.LAS7,
+            UILocation.LAS8
+        ];
+
         /// <summary>
         /// Create a new <see cref="ISpellManager"/> from existing <see cref="CharacterModel"/> database model.
         /// </summary>
@@ -117,17 +129,17 @@ namespace NexusForever.Game.Entity
 
             activeActionSet = model.ActiveSpec;
             innateIndex     = model.InnateIndex;
+            EnsureStarterAbilityShortcuts();
         }
 
         public void GrantSpells()
         {
             // TODO: TEMPORARY, this should eventually be used on level up
             foreach (SpellLevelEntry spellLevel in GameTableManager.Instance.SpellLevel.Entries
-                .Where(s => s.ClassId == (byte)player.Class && s.CharacterLevel <= player.Level)
-                .OrderBy(s => s.CharacterLevel))
+                .Where(s => s.ClassId == (byte)player.Class && ClassSpellLevel.GetUnlockLevel(s) <= player.Level)
+                .OrderBy(ClassSpellLevel.GetUnlockLevel))
             {
-                //FIXME
-                if (spellLevel.PrerequisiteId > 0)
+                if (spellLevel.PrerequisiteId > 0 && !PrerequisiteManager.Instance.Meets(player, spellLevel.PrerequisiteId))
                     continue;
 
                 Spell4Entry spell4Entry = GameTableManager.Instance.Spell4.GetEntry(spellLevel.Spell4Id);
@@ -160,8 +172,7 @@ namespace NexusForever.Game.Entity
             }
 
             ClassEntry classEntry = GameTableManager.Instance.Class.GetEntry((byte)player.Class);
-            foreach (uint classSpell in classEntry.Spell4IdInnateAbilityActive
-                .Concat(classEntry.Spell4IdInnateAbilityPassive)
+            foreach (uint classSpell in GetUnlockedInnateSpells(classEntry)
                 .Concat(classEntry.Spell4IdAttackPrimary)
                 .Concat(classEntry.Spell4IdAttackUnarmed))
             {
@@ -172,6 +183,66 @@ namespace NexusForever.Game.Entity
                 if (GetSpell(spell4Entry.Spell4BaseIdBaseSpell) == null)
                     AddSpell(spell4Entry.Spell4BaseIdBaseSpell);
             }
+        }
+
+        private IEnumerable<uint> GetUnlockedInnateSpells(ClassEntry classEntry)
+        {
+            for (int i = 0; i < classEntry.PrerequisiteIdInnateAbility.Length; i++)
+            {
+                uint prerequisiteId = classEntry.PrerequisiteIdInnateAbility[i];
+                if (prerequisiteId != 0u && !PrerequisiteManager.Instance.Meets(player, prerequisiteId))
+                    continue;
+
+                yield return classEntry.Spell4IdInnateAbilityActive[i];
+                yield return classEntry.Spell4IdInnateAbilityPassive[i];
+            }
+        }
+
+        private void EnsureStarterAbilityShortcuts()
+        {
+            IActionSet actionSet = actionSets[0];
+            if (actionSet == null)
+                return;
+
+            foreach (uint spell4BaseId in GetUnlockedStarterAbilitySpellBaseIds())
+            {
+                if (actionSet.GetShortcut(ShortcutType.SpellbookItem, spell4BaseId) != null)
+                    continue;
+
+                UILocation? location = GetFirstEmptyStarterAbilitySlot(actionSet);
+                if (!location.HasValue)
+                    return;
+
+                actionSet.AddShortcut(location.Value, ShortcutType.SpellbookItem, spell4BaseId, 1);
+            }
+        }
+
+        private IEnumerable<uint> GetUnlockedStarterAbilitySpellBaseIds()
+        {
+            var addedSpellBaseIds = new HashSet<uint>();
+            foreach (SpellLevelEntry spellLevel in GameTableManager.Instance.SpellLevel.Entries
+                .Where(s => s.ClassId == (byte)player.Class && ClassSpellLevel.GetUnlockLevel(s) <= Math.Min(player.Level, 3u))
+                .OrderBy(ClassSpellLevel.GetUnlockLevel))
+            {
+                if (spellLevel.PrerequisiteId > 0 && !PrerequisiteManager.Instance.Meets(player, spellLevel.PrerequisiteId))
+                    continue;
+
+                Spell4Entry spell4Entry = GameTableManager.Instance.Spell4.GetEntry(spellLevel.Spell4Id);
+                if (spell4Entry == null || GetSpell(spell4Entry.Spell4BaseIdBaseSpell) == null)
+                    continue;
+
+                if (addedSpellBaseIds.Add(spell4Entry.Spell4BaseIdBaseSpell))
+                    yield return spell4Entry.Spell4BaseIdBaseSpell;
+            }
+        }
+
+        private static UILocation? GetFirstEmptyStarterAbilitySlot(IActionSet actionSet)
+        {
+            foreach (UILocation location in starterAbilitySlots)
+                if (actionSet.GetShortcut(location) == null)
+                    return location;
+
+            return null;
         }
 
         public void Update(double lastTick)

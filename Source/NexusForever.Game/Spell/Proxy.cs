@@ -53,9 +53,16 @@ namespace NexusForever.Game.Spell
             if (!CanCast)
                 return;
 
+            void CastProxySpell(uint spell4Id)
+            {
+                bool castStarted = caster.CastSpell(spell4Id, proxyParameters);
+                if (castStarted)
+                    ParentSpell.SendProxyPhaseSpellVisuals(caster, spell4Id);
+            }
+
             if (ParentSpell.CastMethod == CastMethod.Aura && Data.Entry.TickTime > 0)
             {
-                caster.CastSpell(Data.PeriodicSpellId, proxyParameters);
+                CastProxySpell(Data.PeriodicSpellId);
                 return;
             }
 
@@ -68,18 +75,18 @@ namespace NexusForever.Game.Spell
                     {
                         events.EnqueueEvent(new SpellEvent(tickTime * i / 1000d, () =>
                         {
-                            caster.CastSpell(Data.PeriodicSpellId, proxyParameters);
+                            CastProxySpell(Data.PeriodicSpellId);
                         }));
                     }
                 }
                 else
                     events.EnqueueEvent(TickingEvent(tickTime, () =>
                     {
-                        caster.CastSpell(Data.PeriodicSpellId, proxyParameters);
+                        CastProxySpell(Data.PeriodicSpellId);
                     }));
             }
             else
-                caster.CastSpell(Data.SpellId, proxyParameters);
+                CastProxySpell(Data.SpellId);
         }
 
         private SpellEvent TickingEvent(double tickTime, Action action)

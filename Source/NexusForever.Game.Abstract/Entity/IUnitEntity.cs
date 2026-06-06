@@ -91,22 +91,22 @@ namespace NexusForever.Game.Abstract.Entity
         /// <summary>
         /// Cast a <see cref="ISpell"/> with the supplied spell id and <see cref="ISpellParameters"/>.
         /// </summary>
-        void CastSpell<T>(T spell4Id, ISpellParameters parameters) where T : Enum;
+        bool CastSpell<T>(T spell4Id, ISpellParameters parameters) where T : Enum;
 
         /// <summary>
         /// Cast a <see cref="ISpell"/> with the supplied spell id and <see cref="ISpellParameters"/>.
         /// </summary>
-        void CastSpell(uint spell4Id, ISpellParameters parameters);
+        bool CastSpell(uint spell4Id, ISpellParameters parameters);
 
         /// <summary>
         /// Cast a <see cref="ISpell"/> with the supplied spell base id, tier and <see cref="ISpellParameters"/>.
         /// </summary>
-        void CastSpell(uint spell4BaseId, byte tier, ISpellParameters parameters);
+        bool CastSpell(uint spell4BaseId, byte tier, ISpellParameters parameters);
 
         /// <summary>
         /// Cast a <see cref="ISpell"/> with the supplied <see cref="ISpellParameters"/>.
         /// </summary>
-        void CastSpell(ISpellParameters parameters);
+        bool CastSpell(ISpellParameters parameters);
 
         /// <summary>
         /// Cancel any <see cref="ISpell"/>'s that are interrupted by movement.

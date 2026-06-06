@@ -54,6 +54,8 @@ namespace NexusForever.Game.Abstract.Spell
 
         bool IsMovingInterrupted();
 
+        void SendProxyPhaseSpellVisuals(IUnitEntity visualUnit, uint spell4Id);
+
         SpellInit BuildSpellInit();
     }
 }
