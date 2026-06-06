@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Numerics;
 using System.Text;
 using NexusForever.Shared;
@@ -55,12 +56,79 @@ namespace NexusForever.Network
 
         private ulong ReadBits(uint bits)
         {
+            if (IsByteAligned() && bits % 8u == 0u)
+                return ReadAlignedBits(bits);
+
             ulong value = 0ul;
             for (uint i = 0u; i < bits; i++)
                 if (ReadBit())
                     value |= 1ul << (int)i;
 
             return value;
+        }
+
+        private bool IsByteAligned()
+        {
+            return currentBitPosition >= 7;
+        }
+
+        private ulong ReadAlignedBits(uint bits)
+        {
+            switch (bits)
+            {
+                case 8:
+                    return ReadAlignedByte();
+                case 16:
+                {
+                    Span<byte> buffer = stackalloc byte[2];
+                    ReadAlignedBytes(buffer);
+                    return BinaryPrimitives.ReadUInt16LittleEndian(buffer);
+                }
+                case 32:
+                {
+                    Span<byte> buffer = stackalloc byte[4];
+                    ReadAlignedBytes(buffer);
+                    return BinaryPrimitives.ReadUInt32LittleEndian(buffer);
+                }
+                case 64:
+                {
+                    Span<byte> buffer = stackalloc byte[8];
+                    ReadAlignedBytes(buffer);
+                    return BinaryPrimitives.ReadUInt64LittleEndian(buffer);
+                }
+                default:
+                {
+                    ulong value = 0ul;
+                    int bytes = (int)(bits / 8u);
+                    for (int i = 0; i < bytes; i++)
+                        value |= (ulong)ReadAlignedByte() << (i * 8);
+                    return value;
+                }
+            }
+        }
+
+        private byte ReadAlignedByte()
+        {
+            int value = stream.ReadByte();
+            if (value == -1)
+                throw new EndOfStreamException();
+
+            currentBitPosition = 7;
+            return (byte)value;
+        }
+
+        private void ReadAlignedBytes(Span<byte> buffer)
+        {
+            for (int offset = 0; offset < buffer.Length;)
+            {
+                int read = stream.Read(buffer[offset..]);
+                if (read == 0)
+                    throw new EndOfStreamException();
+
+                offset += read;
+            }
+
+            currentBitPosition = 7;
         }
 
         public byte ReadByte(uint bits = 8u)
@@ -148,10 +216,37 @@ namespace NexusForever.Network
         public byte[] ReadBytes(uint length)
         {
             byte[] data = new byte[length];
-            for (uint i = 0u; i < length; i++)
-                data[i] = ReadByte();
+            ReadBytes(data, 0, length);
 
             return data;
+        }
+
+        public void ReadBytes(byte[] destination, int offset, uint length)
+        {
+            if (destination == null)
+                throw new ArgumentNullException(nameof(destination));
+            if (offset < 0 || length > destination.Length - offset)
+                throw new ArgumentOutOfRangeException(nameof(offset));
+
+            if (IsByteAligned())
+            {
+                int remaining = (int)length;
+                while (remaining > 0)
+                {
+                    int read = stream.Read(destination, offset, remaining);
+                    if (read == 0)
+                        throw new EndOfStreamException();
+
+                    offset += read;
+                    remaining -= read;
+                }
+
+                currentBitPosition = 7;
+                return;
+            }
+
+            for (uint i = 0u; i < length; i++)
+                destination[offset + (int)i] = ReadByte();
         }
 
         public string ReadWideStringFixed()
