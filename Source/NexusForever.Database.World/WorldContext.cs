@@ -1026,6 +1026,8 @@ namespace NexusForever.Database.World
                 entity.Property(e => e.AppliedOn)
                     .HasColumnName("appliedOn");
             });
+
+            modelBuilder.UseSqliteCompatibility(config);
         }
     }
 }
