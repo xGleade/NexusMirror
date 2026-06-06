@@ -1,5 +1,7 @@
-﻿using System.Net;
+using System.Collections.Concurrent;
+using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 using NexusForever.Network.Session.Static;
 using NexusForever.Shared.Game.Events;
 using NLog;
@@ -31,6 +33,8 @@ namespace NexusForever.Network.Session
         private Socket socket;
         private readonly byte[] buffer = new byte[4096];
         private int bufferOffset;
+        private readonly ConcurrentQueue<PendingSend> pendingSends = new();
+        private int sendActive;
 
         private DisconnectState? disconnectState;
 
@@ -89,6 +93,8 @@ namespace NexusForever.Network.Session
 
         protected virtual void OnDisconnect()
         {
+            pendingSends.Clear();
+
             try
             {
                 EndPoint remoteEndPoint = socket.RemoteEndPoint;
@@ -152,19 +158,86 @@ namespace NexusForever.Network.Session
         /// </summary>
         protected void SendRaw(byte[] data)
         {
+            if (data == null || data.Length == 0 || disconnectState.HasValue || socket == null)
+                return;
+
+            pendingSends.Enqueue(new PendingSend(data));
+            StartSendPump();
+        }
+
+        private void StartSendPump()
+        {
+            if (Interlocked.CompareExchange(ref sendActive, 1, 0) == 0)
+                BeginNextSend();
+        }
+
+        private void BeginNextSend()
+        {
+            if (disconnectState.HasValue)
+            {
+                pendingSends.Clear();
+                Interlocked.Exchange(ref sendActive, 0);
+                return;
+            }
+
+            if (!pendingSends.TryDequeue(out PendingSend send))
+            {
+                Interlocked.Exchange(ref sendActive, 0);
+                if (!pendingSends.IsEmpty)
+                    StartSendPump();
+                return;
+            }
+
+            BeginSend(send);
+        }
+
+        private void BeginSend(PendingSend send)
+        {
             try
             {
-                socket.Send(data, 0, data.Length, SocketFlags.None);
+                socket.BeginSend(send.Buffer, send.Offset, send.Count, SocketFlags.None, SendDataCallback, send);
             }
             catch (Exception e)
             {
                 log.Error(e, $"An exception occured for client {Id} during socket send!");
+                Interlocked.Exchange(ref sendActive, 0);
+                ForceDisconnect();
+            }
+        }
+
+        private void SendDataCallback(IAsyncResult ar)
+        {
+            var send = (PendingSend)ar.AsyncState;
+
+            try
+            {
+                int length = socket.EndSend(ar);
+                if (length <= 0)
+                {
+                    Interlocked.Exchange(ref sendActive, 0);
+                    ForceDisconnect();
+                    return;
+                }
+
+                send.Offset += length;
+                if (send.Count > 0)
+                {
+                    BeginSend(send);
+                    return;
+                }
+
+                BeginNextSend();
+            }
+            catch (Exception e)
+            {
+                log.Error(e, $"An exception occured for client {Id} during socket send!");
+                Interlocked.Exchange(ref sendActive, 0);
                 ForceDisconnect();
             }
         }
 
         /// <summary>
-        /// Forece disconnect of <see cref="NetworkSession"/>.
+        /// Force disconnect of <see cref="NetworkSession"/>.
         /// </summary>
         public void ForceDisconnect()
         {
@@ -172,6 +245,18 @@ namespace NexusForever.Network.Session
                 return;
 
             disconnectState = DisconnectState.Pending;
+        }
+
+        private sealed class PendingSend
+        {
+            public byte[] Buffer { get; }
+            public int Offset { get; set; }
+            public int Count => Buffer.Length - Offset;
+
+            public PendingSend(byte[] buffer)
+            {
+                Buffer = buffer;
+            }
         }
     }
 }
