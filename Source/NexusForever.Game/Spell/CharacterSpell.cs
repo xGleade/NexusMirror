@@ -219,10 +219,10 @@ namespace NexusForever.Game.Spell
             if (AlternateSpellInfo != null && CheckRunnerOverride())
                 spellInfoToCast = AlternateSpellInfo;
 
-            // For Threshold Spells
-            if (Owner.HasSpell(spellInfoToCast.Entry.Id, out ISpell spell, isCasting: castMethod == CastMethod.ChargeRelease))
+            // Charge-release spells keep their held parent cast active and release through the same spell instance.
+            if (castMethod == CastMethod.ChargeRelease && Owner.HasSpell(spellInfoToCast.Entry.Id, out ISpell spell, isCasting: true))
             {
-                if ((spell.CastMethod == CastMethod.RapidTap || spell.CastMethod == CastMethod.ChargeRelease) && !spell.IsFinished)
+                if (!spell.IsFinished)
                 {
                     spell.Cast();
                     return;
@@ -232,13 +232,7 @@ namespace NexusForever.Game.Spell
             if (!buttonPressed)
                 return;
 
-            Owner.CastSpell(new SpellParameters
-            {
-                CharacterSpell         = this,
-                RootSpellInfo          = SpellInfo,
-                SpellInfo              = spellInfoToCast,
-                UserInitiatedSpellCast = true
-            });
+            Owner.SpellManager.CastOrQueueAbility(this, spellInfoToCast);
         }
 
         public void UseCharge()

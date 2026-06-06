@@ -97,6 +97,8 @@ namespace NexusForever.Game.Abstract.Entity
         /// </summary>
         void SetAsContinuousCast(ICharacterSpell spell);
 
+        void CastOrQueueAbility(ICharacterSpell spell, ISpellInfo spellInfo = null);
+
         /// <summary>
         /// Update active Innate Ability with supplied index.
         /// </summary>

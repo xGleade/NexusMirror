@@ -23,5 +23,6 @@ namespace NexusForever.Game.Abstract.Spell
         Action<ISpellParameters> CompleteAction { get; set; }
         int CastTimeOverride { get; set; }
         double CooldownOverride { get; set; }
+        double? GlobalCooldownBypassThresholdSeconds { get; set; }
     }
 }

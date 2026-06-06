@@ -283,7 +283,7 @@ namespace NexusForever.Game.Spell
                         return CastResult.SpellCooldown;
                 }
 
-                if (player.SpellManager.GetGlobalSpellCooldown(Parameters.SpellInfo.Entry.GlobalCooldownEnum) > 0d &&
+                if (IsBlockedByGlobalCooldown(player.SpellManager.GetGlobalSpellCooldown(Parameters.SpellInfo.Entry.GlobalCooldownEnum)) &&
                     !Parameters.IsProxy &&
                     Parameters.UserInitiatedSpellCast)
                     return CastResult.SpellGlobalCooldown;
@@ -302,6 +302,15 @@ namespace NexusForever.Game.Spell
             }
 
             return CastResult.Ok;
+        }
+
+        private bool IsBlockedByGlobalCooldown(double remaining)
+        {
+            if (remaining <= 0d)
+                return false;
+
+            return !Parameters.GlobalCooldownBypassThresholdSeconds.HasValue
+                || remaining > Parameters.GlobalCooldownBypassThresholdSeconds.Value + 0.001d;
         }
 
         private CastResult CheckPrerequisites()

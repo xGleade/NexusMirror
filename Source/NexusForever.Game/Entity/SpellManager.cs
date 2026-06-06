@@ -34,6 +34,24 @@ namespace NexusForever.Game.Entity
         }
 
         private static readonly ILogger log = LogManager.GetCurrentClassLogger();
+        private const uint RelentlessStrikesSpell4BaseId = 18309u;
+        private const double DefaultAbilityQueueWindowSeconds = 0.4d;
+
+        private sealed class QueuedAbility
+        {
+            public ICharacterSpell Spell { get; init; }
+            public ISpellInfo SpellInfo { get; init; }
+            public ISpellInfo ParentSpellInfo { get; init; }
+            public bool IsMultiTapThreshold { get; init; }
+            public double ExpireTimer { get; set; }
+        }
+
+        private sealed class MultiTapState
+        {
+            public uint ParentSpell4Id { get; init; }
+            public int NextThresholdIndex { get; set; }
+            public double TimeRemaining { get; set; }
+        }
 
         /// <summary>
         /// Index of the active <see cref="IActionSet"/>.
@@ -67,7 +85,10 @@ namespace NexusForever.Game.Entity
         private readonly Dictionary<uint /*spell4Id*/, double /*cooldown*/> spellCooldowns = new();
         private readonly Dictionary<uint /*cooldownId*/, double /*cooldown*/> cooldownIds = new();
         private readonly Dictionary<uint /*globalCooldownEnum*/, double /*cooldown*/> globalSpellCooldowns = new();
+        private readonly Dictionary<uint /*spell4BaseId*/, MultiTapState> multiTapStates = new();
+        private readonly Dictionary<uint /*spell4Id*/, List<Spell4ThresholdsEntry>> spellThresholdCache = new();
         private uint maxGlobalSpellCooldownEnum = 3; // TODO: Read value from GameTables?
+        private QueuedAbility queuedAbility;
 
         private readonly IActionSet[] actionSets = new ActionSet[ActionSet.MaxActionSets];
 
@@ -253,7 +274,7 @@ namespace NexusForever.Game.Entity
                 if (cooldown <= 0d)
                     continue;
 
-                globalSpellCooldowns[globalEnum] = cooldown - lastTick;
+                globalSpellCooldowns[globalEnum] = Math.Max(0d, cooldown - lastTick);
             }
 
             // update spell cooldowns
@@ -283,7 +304,10 @@ namespace NexusForever.Game.Entity
             foreach (CharacterSpell unlockedSpell in spells.Values)
                 unlockedSpell.Update(lastTick);
 
-            if (continuousSpell != null && globalSpellCooldowns[continuousSpell.GlobalCooldownEnum] <= 0d && !player.IsCasting())
+            UpdateMultiTapStates(lastTick);
+            UpdateQueuedAbility(lastTick);
+
+            if (queuedAbility == null && continuousSpell != null && GetGlobalSpellCooldown(continuousSpell.GlobalCooldownEnum) <= 0d && !player.IsCasting())
                 continuousSpell?.SpellManagerCast();
         }
 
@@ -566,13 +590,281 @@ namespace NexusForever.Game.Entity
 
         public double GetGlobalSpellCooldown(uint globalEnum)
         {
-            return globalSpellCooldowns[globalEnum];
+            return globalSpellCooldowns.TryGetValue(globalEnum, out double cooldown) ? cooldown : 0d;
         }
 
         public void SetGlobalSpellCooldown(uint globalEnum, double cooldown)
         {
-            globalSpellCooldowns[globalEnum] = cooldown;
+            globalSpellCooldowns[globalEnum] = Math.Max(0d, cooldown);
             log.Trace($"Global spell cooldown {globalEnum} set to {cooldown} seconds.");
+        }
+
+        public void CastOrQueueAbility(ICharacterSpell spell, ISpellInfo spellInfo = null)
+        {
+            if (spell == null)
+                throw new ArgumentNullException();
+
+            ISpellInfo parentSpellInfo = spellInfo ?? GetActiveSpellInfo(spell);
+            if (parentSpellInfo == null)
+                throw new InvalidOperationException($"Unable to resolve active spell info for base spell {spell.BaseInfo.Entry.Id}.");
+
+            (ISpellInfo castSpellInfo, ISpellInfo castParentSpellInfo, bool isMultiTapThreshold) = ResolveCastSpellInfo(spell, parentSpellInfo);
+            double queueDelay = GetAbilityQueueDelay(spell, castSpellInfo, isMultiTapThreshold);
+            double queueWindow = GetAbilityQueueWindowSeconds(castSpellInfo, isMultiTapThreshold);
+            if (queueDelay > 0d && queueDelay <= queueWindow)
+            {
+                queuedAbility = new QueuedAbility
+                {
+                    Spell               = spell,
+                    SpellInfo           = castSpellInfo,
+                    ParentSpellInfo     = castParentSpellInfo,
+                    IsMultiTapThreshold = isMultiTapThreshold,
+                    ExpireTimer         = queueWindow
+                };
+
+                log.Trace($"Queued LAS ability player={player.Guid} activeSet={ActiveActionSet} base={spell.BaseInfo.Entry.Id} spell4={castSpellInfo.Entry.Id} multiTap={isMultiTapThreshold} window={queueWindow:0.000}s.");
+                return;
+            }
+
+            CastAbility(spell, castSpellInfo, castParentSpellInfo, isMultiTapThreshold);
+        }
+
+        private void UpdateQueuedAbility(double lastTick)
+        {
+            if (queuedAbility == null)
+                return;
+
+            queuedAbility.ExpireTimer = Math.Max(0d, queuedAbility.ExpireTimer - lastTick);
+            if (CanCastQueuedAbility(queuedAbility))
+            {
+                QueuedAbility ability = queuedAbility;
+                queuedAbility = null;
+                CastAbility(ability.Spell, ability.SpellInfo, ability.ParentSpellInfo, ability.IsMultiTapThreshold);
+                return;
+            }
+
+            if (queuedAbility.ExpireTimer <= 0d)
+            {
+                log.Trace($"Queued spell {queuedAbility.SpellInfo.Entry.Id} expired before it could be cast.");
+                queuedAbility = null;
+            }
+        }
+
+        private bool CanCastQueuedAbility(QueuedAbility ability)
+        {
+            return !player.IsCasting() && GetAbilityQueueDelay(ability.Spell, ability.SpellInfo, ability.IsMultiTapThreshold) <= 0d;
+        }
+
+        private double GetAbilityQueueDelay(ICharacterSpell spell, ISpellInfo spellInfo, bool isMultiTapThreshold)
+        {
+            double delay = GetSpellCooldown(spellInfo.Entry.Id);
+            foreach (SpellCoolDownEntry coolDownEntry in spellInfo.Cooldowns)
+                delay = Math.Max(delay, GetSpellCooldownByCooldownId(coolDownEntry.Id));
+
+            double globalCooldownDelay = GetGlobalSpellCooldown(spellInfo.Entry.GlobalCooldownEnum);
+            double? bypassThreshold = GetGlobalCooldownBypassThresholdSeconds(spell, spellInfo, isMultiTapThreshold);
+            if (bypassThreshold.HasValue)
+                globalCooldownDelay = Math.Max(0d, globalCooldownDelay - bypassThreshold.Value);
+
+            return Math.Max(delay, globalCooldownDelay);
+        }
+
+        private static double GetAbilityQueueWindowSeconds(ISpellInfo spellInfo, bool isMultiTapThreshold)
+        {
+            double window = DefaultAbilityQueueWindowSeconds;
+            if (isMultiTapThreshold)
+                window = Math.Max(window, GetMultiTapGlobalCooldownBypassThresholdSeconds(spellInfo));
+
+            return Math.Max(0d, window);
+        }
+
+        private void CastAbility(ICharacterSpell spell, ISpellInfo spellInfo, ISpellInfo parentSpellInfo, bool isMultiTapThreshold)
+        {
+            log.Trace($"Casting LAS ability player={player.Guid} activeSet={ActiveActionSet} base={spell.BaseInfo.Entry.Id} spell4={spellInfo.Entry.Id} multiTap={isMultiTapThreshold}.");
+
+            double? globalCooldownBypassThreshold = GetGlobalCooldownBypassThresholdSeconds(spell, spellInfo, isMultiTapThreshold);
+            bool castStarted = player.CastSpell(new SpellParameters
+            {
+                CharacterSpell                       = spell,
+                SpellInfo                            = spellInfo,
+                ParentSpellInfo                      = isMultiTapThreshold ? parentSpellInfo : null,
+                RootSpellInfo                        = isMultiTapThreshold ? parentSpellInfo : spellInfo,
+                UserInitiatedSpellCast               = true,
+                GlobalCooldownBypassThresholdSeconds = globalCooldownBypassThreshold
+            });
+
+            if (castStarted)
+                AdvanceMultiTapState(spell, parentSpellInfo, spellInfo);
+        }
+
+        private void UpdateMultiTapStates(double lastTick)
+        {
+            foreach ((uint spell4BaseId, MultiTapState state) in multiTapStates.ToArray())
+            {
+                state.TimeRemaining = Math.Max(0d, state.TimeRemaining - lastTick);
+                if (state.TimeRemaining <= 0d)
+                {
+                    multiTapStates.Remove(spell4BaseId);
+                    SendThresholdClear(state.ParentSpell4Id);
+                }
+            }
+        }
+
+        private (ISpellInfo SpellInfo, ISpellInfo ParentSpellInfo, bool IsMultiTapThreshold) ResolveCastSpellInfo(ICharacterSpell spell, ISpellInfo parentSpellInfo)
+        {
+            uint spell4BaseId = spell.BaseInfo.Entry.Id;
+            if (!multiTapStates.TryGetValue(spell4BaseId, out MultiTapState state)
+                || state.ParentSpell4Id != parentSpellInfo.Entry.Id
+                || state.TimeRemaining <= 0d)
+            {
+                if (state != null)
+                    SendThresholdClear(state.ParentSpell4Id);
+
+                multiTapStates.Remove(spell4BaseId);
+                return (parentSpellInfo, parentSpellInfo, false);
+            }
+
+            List<Spell4ThresholdsEntry> thresholds = GetThresholds(parentSpellInfo);
+            if (state.NextThresholdIndex < 0 || state.NextThresholdIndex >= thresholds.Count)
+                return (parentSpellInfo, parentSpellInfo, false);
+
+            ISpellInfo thresholdSpellInfo = GetSpellInfo(thresholds[state.NextThresholdIndex].Spell4IdToCast);
+            return thresholdSpellInfo == null
+                ? (parentSpellInfo, parentSpellInfo, false)
+                : (thresholdSpellInfo, parentSpellInfo, true);
+        }
+
+        private ISpellInfo GetActiveSpellInfo(ICharacterSpell spell)
+        {
+            return spell.BaseInfo.GetSpellInfo(GetSpellTier(spell.BaseInfo.Entry.Id));
+        }
+
+        private void AdvanceMultiTapState(ICharacterSpell spell, ISpellInfo parentSpellInfo, ISpellInfo castSpellInfo)
+        {
+            uint spell4BaseId = spell.BaseInfo.Entry.Id;
+            List<Spell4ThresholdsEntry> thresholds = GetThresholds(parentSpellInfo);
+            if (thresholds.Count == 0)
+            {
+                multiTapStates.Remove(spell4BaseId);
+                return;
+            }
+
+            int nextThresholdIndex;
+            if (castSpellInfo.Entry.Id == parentSpellInfo.Entry.Id)
+                nextThresholdIndex = 0;
+            else
+            {
+                int currentThresholdIndex = thresholds.FindIndex(t => t.Spell4IdToCast == castSpellInfo.Entry.Id);
+                if (currentThresholdIndex < 0)
+                {
+                    multiTapStates.Remove(spell4BaseId);
+                    SendThresholdClear(parentSpellInfo.Entry.Id);
+                    return;
+                }
+
+                nextThresholdIndex = currentThresholdIndex + 1;
+            }
+
+            if (nextThresholdIndex >= thresholds.Count)
+            {
+                multiTapStates.Remove(spell4BaseId);
+                SendThresholdClear(parentSpellInfo.Entry.Id);
+                return;
+            }
+
+            double timeRemaining = GetThresholdWindowSeconds(parentSpellInfo, thresholds[nextThresholdIndex]);
+            if (timeRemaining <= 0d)
+            {
+                multiTapStates.Remove(spell4BaseId);
+                SendThresholdClear(parentSpellInfo.Entry.Id);
+                return;
+            }
+
+            multiTapStates[spell4BaseId] = new MultiTapState
+            {
+                ParentSpell4Id     = parentSpellInfo.Entry.Id,
+                NextThresholdIndex = nextThresholdIndex,
+                TimeRemaining      = timeRemaining
+            };
+
+            if (castSpellInfo.Entry.Id != parentSpellInfo.Entry.Id)
+                SendThresholdUpdate(parentSpellInfo.Entry.Id, (byte)nextThresholdIndex);
+        }
+
+        private void SendThresholdUpdate(uint parentSpell4Id, byte threshold)
+        {
+            player.Session.EnqueueMessageEncrypted(new ServerSpellThresholdUpdate
+            {
+                Spell4Id = parentSpell4Id,
+                Value    = threshold
+            });
+        }
+
+        private void SendThresholdClear(uint parentSpell4Id)
+        {
+            player.Session.EnqueueMessageEncrypted(new ServerSpellThresholdClear
+            {
+                Spell4Id = parentSpell4Id
+            });
+        }
+
+        private List<Spell4ThresholdsEntry> GetThresholds(ISpellInfo spellInfo)
+        {
+            if (!spellThresholdCache.TryGetValue(spellInfo.Entry.Id, out List<Spell4ThresholdsEntry> thresholds))
+            {
+                thresholds = spellInfo.Thresholds
+                    .OrderBy(t => t.OrderIndex)
+                    .ToList();
+
+                spellThresholdCache.Add(spellInfo.Entry.Id, thresholds);
+            }
+
+            return thresholds;
+        }
+
+        private static double GetThresholdWindowSeconds(ISpellInfo parentSpellInfo, Spell4ThresholdsEntry nextThreshold)
+        {
+            uint thresholdTime = nextThreshold.ThresholdDuration;
+            if (thresholdTime == 0u)
+                thresholdTime = parentSpellInfo.Entry.ThresholdTime;
+
+            return thresholdTime / 1000d;
+        }
+
+        private static double GetMultiTapGlobalCooldownBypassThresholdSeconds(ISpellInfo spellInfo)
+        {
+            return (spellInfo.GlobalCooldown?.CooldownTime ?? 0u) / 2000d;
+        }
+
+        private static double? GetGlobalCooldownBypassThresholdSeconds(ICharacterSpell spell, ISpellInfo spellInfo, bool isMultiTapThreshold)
+        {
+            if (!isMultiTapThreshold || spell.BaseInfo.Entry.Id == RelentlessStrikesSpell4BaseId)
+                return null;
+
+            return GetMultiTapGlobalCooldownBypassThresholdSeconds(spellInfo);
+        }
+
+        private ISpellInfo GetSpellInfo(uint spell4Id)
+        {
+            Spell4Entry entry = GameTableManager.Instance.Spell4.GetEntry(spell4Id);
+            if (entry == null)
+                return null;
+
+            ISpellBaseInfo spellBaseInfo = LegacyServiceProvider.Provider.GetService<ISpellInfoManager>().GetSpellBaseInfo(entry.Spell4BaseIdBaseSpell);
+            return spellBaseInfo?.GetSpellInfo((byte)entry.TierIndex);
+        }
+
+        private void ClearActionSetCastState()
+        {
+            if (queuedAbility == null && multiTapStates.Count == 0)
+                return;
+
+            log.Trace($"Clearing LAS cast state player={player.Guid} activeSet={ActiveActionSet} queued={(queuedAbility != null ? queuedAbility.SpellInfo.Entry.Id : 0u)} multiTapStates={multiTapStates.Count}.");
+            queuedAbility = null;
+            foreach (MultiTapState state in multiTapStates.Values)
+                SendThresholdClear(state.ParentSpell4Id);
+
+            multiTapStates.Clear();
         }
 
         /// <summary>
@@ -599,6 +891,7 @@ namespace NexusForever.Game.Entity
 
             // TODO: handle other errors
 
+            ClearActionSetCastState();
             ActiveActionSet = value;
             return SpecError.Ok;
         }
